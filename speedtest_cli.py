@@ -29,6 +29,7 @@ import threading
 import re
 import signal
 import socket
+import datetime
 
 # Used for bound_interface
 socket_socket = socket.socket
@@ -456,6 +457,8 @@ def speedtest():
     parser.add_argument('--simple', action='store_true',
                         help='Suppress verbose output, only show basic '
                              'information')
+    parser.add_argument('--tabbed', action='store_true',
+			help='Return results in a tabbed fashion i.e. ready to be written on a file')
     parser.add_argument('--list', action='store_true',
                         help='Display a list of speedtest.net servers '
                              'sorted by distance')
@@ -481,7 +484,7 @@ def speedtest():
         source = args.source
         socket.socket = bound_socket
 
-    if not args.simple:
+    if not (args.simple or args.tabbed):
         print_('Retrieving speedtest.net configuration...')
     try:
         config = getConfig()
@@ -489,7 +492,7 @@ def speedtest():
         print_('Cannot retrieve speedtest configuration')
         sys.exit(1)
 
-    if not args.simple:
+    if not (args.simple or args.tabbed):
         print_('Retrieving speedtest.net server list...')
     if args.list or args.server:
         servers = closestServers(config['client'], True)
@@ -513,7 +516,7 @@ def speedtest():
     else:
         servers = closestServers(config['client'])
 
-    if not args.simple:
+    if not (args.simple or args.tabbed):
         print_('Testing from %(isp)s (%(ip)s)...' % config['client'])
 
     if args.server:
@@ -555,11 +558,11 @@ def speedtest():
         except:
             best = servers[0]
     else:
-        if not args.simple:
+        if not (args.simple or args.tabbed):
             print_('Selecting best server based on ping...')
         best = getBestServer(servers)
 
-    if not args.simple:
+    if not (args.simple or args.tabbed):
         # Python 2.7 and newer seem to be ok with the resultant encoding
         # from parsing the XML, but older versions have some issues.
         # This block should detect whether we need to encode or not
@@ -570,8 +573,14 @@ def speedtest():
         except NameError:
             print_('Hosted by %(sponsor)s (%(name)s) [%(d)0.2f km]: '
                    '%(latency)s ms' % best)
-    else:
+    elif not args.tabbed:
         print_('Ping: %(latency)s ms' % best)
+	
+    if args.tabbed:
+        ts = time.time()
+        st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+	print_('Timestamp: %s, ' % (st), end='')
+	print_('Target: %(sponsor)s, City: %(name)s, Distance: %(d)0.2f km, Latency: %(latency)s ms, ' % (best), end='')
 
     sizes = [350, 500, 750, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
     urls = []
@@ -579,23 +588,31 @@ def speedtest():
         for i in range(0, 4):
             urls.append('%s/random%sx%s.jpg' %
                         (os.path.dirname(best['url']), size, size))
-    if not args.simple:
+    if not (args.simple or args.tabbed):
         print_('Testing download speed', end='')
-    dlspeed = downloadSpeed(urls, args.simple)
-    if not args.simple:
+
+    dlspeed = downloadSpeed(urls, (args.simple or args.tabbed))
+
+    if not (args.simple or args.tabbed):
         print_()
-    print_('Download: %0.2f Mbit/s' % ((dlspeed / 1000 / 1000) * 8))
+
+    if args.tabbed:
+	print_('Download: %0.2f Mbit/s, ' % ((dlspeed / 1000 / 1000) * 8), end='')
+    else:
+	print_('Download: %0.2f Mbit/s' % ((dlspeed / 1000 / 1000) * 8))
 
     sizesizes = [int(.25 * 1000 * 1000), int(.5 * 1000 * 1000)]
     sizes = []
     for size in sizesizes:
         for i in range(0, 25):
             sizes.append(size)
-    if not args.simple:
+    if not (args.simple or args.tabbed):
         print_('Testing upload speed', end='')
-    ulspeed = uploadSpeed(best['url'], sizes, args.simple)
-    if not args.simple:
+    ulspeed = uploadSpeed(best['url'], sizes, (args.simple or args.tabbed))
+
+    if not (args.simple or args.tabbed):
         print_()
+
     print_('Upload: %0.2f Mbit/s' % ((ulspeed / 1000 / 1000) * 8))
 
     if args.share and args.mini:
